@@ -244,10 +244,10 @@ int perform_read(int id, kvs_container_handle cont_hd, int count, kvs_key_t klen
     exit(1);
   }
 
-  //int start_key = id * count;
-  //for (int i = start_key; i < start_key + count; i++) {
+  int start_key = id * count;
+  for (int i = start_key; i < start_key + count; i++) {
     memset(value, 0, vlen);
-    sprintf(key, "hello");
+    sprintf(key, "%0*d", klen - 1, i);
     kvs_retrieve_option option;
     memset(&option, 0, sizeof(kvs_retrieve_option));
     option.kvs_retrieve_decompress = false;
@@ -262,9 +262,9 @@ int perform_read(int id, kvs_container_handle cont_hd, int count, kvs_key_t klen
       fprintf(stderr, "retrieve tuple %s failed with error 0x%x - %s\n", key, ret, kvs_errstr(ret));
       //exit(1);
     } else {
-      fprintf(stdout, "retrieve tuple %s with value = %s, vlen = %d, actual vlen = %d \n", key, value, kvsvalue.length, kvsvalue.actual_value_size);
+      //fprintf(stdout, "retrieve tuple %s with value = %s, vlen = %d, actual vlen = %d \n", key, value, kvsvalue.length, kvsvalue.actual_value_size);
     }
-  //}
+  }
 
   if(key) kvs_free(key);
   if(value) kvs_free(value);
@@ -282,12 +282,11 @@ int perform_insertion(int id, kvs_container_handle cont_hd, int count, kvs_key_t
     exit(1);
   }
 
-  //int start_key = id * count;
+  int start_key = id * count;
 
-  //for(int i = start_key; i < start_key + count; i++) {
+  for(int i = start_key; i < start_key + count; i++) {
 
-    sprintf(key, "hello");
-    sprintf(value, "world");
+    sprintf(key, "%0*d", klen - 1, i);
     //sprintf(value, "%0*d", klen - 1, i + 10);
     kvs_store_option option;
     option.st_type = KVS_STORE_POST;
@@ -302,14 +301,12 @@ int perform_insertion(int id, kvs_container_handle cont_hd, int count, kvs_key_t
       fprintf(stderr, "store tuple failed with error 0x%x - %s\n", ret, kvs_errstr(ret));
       exit(1);
     } else {
-      fprintf(stdout, "thread %d store key %s with value %s done \n", id, key, value);
+      //fprintf(stdout, "thread %d store key %s with value %s done \n", id, key, value);
     }
 
-    /*
     if(i % 100 == 0)
       fprintf(stdout, "%d\r", i);
-      */
-  //}
+  }
 
   if(key) kvs_free(key);
   if(value) kvs_free(value);
@@ -326,9 +323,9 @@ int perform_delete(int id, kvs_container_handle cont_hd, int count, kvs_key_t kl
     exit(1);
   }
 
-  //int start_key = id * count;  
-  //for(int i = start_key; i < start_key + count; i++) {
-    sprintf(key, "hello");
+  int start_key = id * count;  
+  for(int i = start_key; i < start_key + count; i++) {
+    sprintf(key, "%0*d", klen - 1, i);
     const kvs_key  kvskey = { key, klen};
     
     const kvs_delete_context del_ctx = { {false}, 0, 0};
@@ -339,7 +336,7 @@ int perform_delete(int id, kvs_container_handle cont_hd, int count, kvs_key_t kl
     } else {
       fprintf(stderr, "delete key %s done \n", key);
     }
-  //}
+  }
 
   if(key) kvs_free(key);
   return 0;
@@ -353,10 +350,10 @@ int perform_key_exist(int id, kvs_container_handle cont_hd, int count, kvs_key_t
     exit(1);
   }
   uint8_t status = 0;
-  //int start_key = id * count;
-  //for(int i = start_key; i < start_key + count; i++) {
+  int start_key = id * count;
+  for(int i = start_key; i < start_key + count; i++) {
     status = 0;
-    sprintf(key, "hello");
+    sprintf(key, "%0*d", klen - 1, i);
     const kvs_key  kvskey = { key, klen};
     const kvs_exist_context exist_ctx = {0, 0};
 
@@ -367,7 +364,7 @@ int perform_key_exist(int id, kvs_container_handle cont_hd, int count, kvs_key_t
     } else {
       fprintf(stderr, "check key %s exist? %s\n", key, status == 0? "FALSE":"TRUE");
     }
-  //}
+  }
 
   if(key) kvs_free(key);
   return 0;
@@ -412,89 +409,8 @@ void *iothread(void *args)
   return 0;
 }
 
-int main() {
-    // Test routine:
-    // is exists? "hello" 
-    // insert "world" to "hello"
-    // read "hello"
-    // delete "hello"
-    // delete "hello"
-    // is exists? "hello" 
 
-    // Device init
-    //
-
-    kvs_init_options options;
-    kvs_init_env_opts(&options);
-
-    char qolon = ':';//character to search
-    char *found;
-    found = strchr("/dev/nvme0n1", qolon);
-
-    options.memory.use_dpdk = 0;
-
-    const char *configfile = "../kvssd_emul.conf";
-    options.emul_config_file =  configfile;
-
-    if(found) { // spdk driver
-        use_udd = 1;
-        options.memory.use_dpdk = 1;
-        char *core;
-        core = options.udd.core_mask_str;
-        *core = '0';
-        core = options.udd.cq_thread_mask;
-        *core = '0';
-        options.udd.mem_size_mb = 1024;
-        options.udd.syncio = 1; // use sync IO mode
-        cpu_set_t cpuset;
-        CPU_ZERO(&cpuset);
-        CPU_SET(0, &cpuset); // CPU 0
-        sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);    
-
-    } else {
-        use_udd = 0;
-        options.memory.use_dpdk = 0;
-    }
-
-    // initialize the environment
-    kvs_init_env(&options);
-    kvs_device_handle dev;
-    int ret = kvs_open_device("/dev/nvme0n1", &dev);
-    if (ret != KVS_SUCCESS) {
-        fprintf(stderr, "Device open failed\n");
-        exit(1);
-    }
-
-    kvs_container_context ctx;
-    kvs_create_container(dev, "test", 4, &ctx);
-
-    kvs_container_handle cont_handle;
-    kvs_open_container(dev, "test", &cont_handle);
-
-    int key_length = 5;
-    uint32_t value_length = 32;
-
-    // IS_EXSITS
-    perform_key_exist(1, cont_handle, 1, key_length, value_length);
-    
-    // INSERT
-    perform_insertion(2, cont_handle, 1, key_length, value_length);
-
-    // READ
-    perform_read(3, cont_handle, 1, key_length, value_length);
-    
-    // DELETE
-    perform_delete(4, cont_handle, 1, key_length, value_length);
-
-    // IS_EXSITS
-    perform_key_exist(5, cont_handle, 1, key_length, value_length);
-
-    kvs_close_container(cont_handle);
-    kvs_delete_container(dev, "test");
-    kvs_exit_env();
-}
-
-int _main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) {
   char* dev_path = NULL;
   int num_ios = 10;
   int op_type = 1;
@@ -552,7 +468,7 @@ int _main(int argc, char *argv[]) {
   
   options.memory.use_dpdk = 0;
   
-  const char *configfile = "./kvssd_emul.conf";
+  const char *configfile = "../kvssd_emul.conf";
   options.emul_config_file =  configfile;
   
   if(found) { // spdk driver
